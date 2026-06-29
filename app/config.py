@@ -8,6 +8,21 @@ ENV_FILE = BASE_DIR / ".env"
 load_dotenv(ENV_FILE, override=False)
 
 
+def _load_streamlit_secrets() -> None:
+    """Load Streamlit Cloud secrets into the environment when available."""
+    try:
+        import streamlit as st
+
+        for key, value in st.secrets.items():
+            if isinstance(value, (str, int, float, bool)):
+                os.environ.setdefault(str(key), str(value))
+    except Exception:
+        return
+
+
+_load_streamlit_secrets()
+
+
 def get_setting(name: str, default: str | None = None) -> str:
     """Read a setting from the environment with a fallback default."""
     value = os.getenv(name)

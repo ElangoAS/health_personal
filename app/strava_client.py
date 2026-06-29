@@ -52,6 +52,15 @@ class StravaClient:
         if self.cache_enabled:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def clear_cache(cache_dir: Path | None = None) -> None:
+        """Remove cached Strava API responses."""
+        directory = Path(cache_dir or CACHE_DIR)
+        if not directory.exists():
+            return
+        for cache_file in directory.glob("*.json"):
+            cache_file.unlink(missing_ok=True)
+
     def _set_auth_header(self) -> None:
         if not self.access_token:
             raise ValueError("Missing Strava access token")
@@ -109,6 +118,17 @@ class StravaClient:
         self.refresh_token = token_data.get("refresh_token", self.refresh_token)
         os.environ["STRAVA_ACCESS_TOKEN"] = self.access_token
         os.environ["STRAVA_REFRESH_TOKEN"] = self.refresh_token
+        try:
+            from .auth_helper import update_env_file
+
+            update_env_file(
+                {
+                    "STRAVA_ACCESS_TOKEN": self.access_token,
+                    "STRAVA_REFRESH_TOKEN": self.refresh_token,
+                }
+            )
+        except OSError as exc:
+            self.logger.warning("Could not persist refreshed Strava tokens to .env: %s", exc)
         self.logger.info("Strava access token refreshed successfully")
         return {
             "access_token": self.access_token,

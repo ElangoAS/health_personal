@@ -20,8 +20,9 @@ def run_pipeline(per_page: int = 100, max_pages: int = 5) -> dict[str, Any]:
     """Fetch Strava activities, process them, and store them in SQLite."""
     logger = setup_logging()
     init_db()
+    StravaClient.clear_cache()
 
-    client = StravaClient()
+    client = StravaClient(cache_enabled=False)
     try:
         activities = client.get_all_activities(per_page=per_page, max_pages=max_pages)
     except Exception as exc:  # pragma: no cover

@@ -37,11 +37,14 @@ def _data_version(last_run: dict | None) -> str:
     return "empty"
 
 
-def _format_last_sync(last_run: dict | None) -> str:
+def _format_last_sync(last_run: dict | None, latest_activity_date: pd.Timestamp | None = None) -> str:
     """Build a human-readable last-sync label for the dashboard."""
+    parts: list[str] = []
     if last_run and last_run.get("completed_at"):
-        return f"Last updated: {last_run['completed_at']}"
-    return "No data loaded yet"
+        parts.append(f"Last synced: {last_run['completed_at']}")
+    if latest_activity_date is not None and pd.notna(latest_activity_date):
+        parts.append(f"Latest run: {latest_activity_date.strftime('%Y-%m-%d %H:%M')}")
+    return " | ".join(parts) if parts else "No data loaded yet"
 
 
 def _fetch_latest_data() -> dict:
@@ -80,8 +83,8 @@ def render() -> None:
             st.caption("Track your training load, pace, and AI coaching insights")
             st.info("No run data yet. Click **Load latest data** in the sidebar to fetch your Strava activities.")
             return
-        st.caption(_format_last_sync(last_run))
         df = load_data(_data_version(last_run))
+        st.caption(_format_last_sync(last_run, df["start_date"].max()))
 
     if df.empty:
         st.warning("No training data to display.")
