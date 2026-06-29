@@ -34,6 +34,8 @@ python -m app.main
 streamlit run app/dashboard.py
 ```
 
+The dashboard loads activities from SQLite on startup. Use **Load latest data** in the sidebar to fetch fresh activities from Strava and refresh the view.
+
 ## Authorize Strava
 1. Open the authorization URL:
    ```bash
@@ -64,6 +66,7 @@ pytest
 ```
 
 ## Output files
-- Raw activity JSON files are stored in the `data/` folder.
-- Processed CSV files are stored in the `data/` folder.
+- Activity data is stored in `data/running_coach.db` (SQLite).
+- On first run, existing `data/processed_activities_*.csv` files are imported automatically if the database is empty.
+- Strava API cache files are stored in `data/cache/`.
 - Application logs are written to `logs/app.log`.

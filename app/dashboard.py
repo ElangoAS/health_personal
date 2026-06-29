@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 import tempfile
 
@@ -12,40 +13,75 @@ if str(project_root) not in sys.path:
 import pandas as pd
 import streamlit as st
 
-from app.recommendations import generate_recommendation
-from app.utils import get_latest_csv
 from app.ai_coach import AIRunningCoach
+from app.db import has_activities, init_db, load_activities_df
+from app.pipeline import get_last_run, run_pipeline
+from app.recommendations import generate_recommendation
 
 
 st.set_page_config(page_title="AI Running Coach", page_icon="🏃", layout="wide")
 
 
 @st.cache_data(show_spinner=False)
-def load_data(csv_path: str) -> pd.DataFrame:
-    """Load a processed CSV file into a DataFrame."""
-    df = pd.read_csv(csv_path, parse_dates=["start_date"])
-    if "pace_min_per_km" not in df.columns:
-        df["pace_min_per_km"] = None
-    return df.sort_values("start_date").reset_index(drop=True)
+def load_data(data_version: str) -> pd.DataFrame:
+    """Load activities from SQLite into a DataFrame."""
+    _ = data_version
+    init_db()
+    return load_activities_df()
+
+
+def _data_version(last_run: dict | None) -> str:
+    """Build a cache key that changes when the database is refreshed."""
+    if last_run and last_run.get("completed_at"):
+        return str(last_run["completed_at"])
+    return "empty"
+
+
+def _format_last_sync(last_run: dict | None) -> str:
+    """Build a human-readable last-sync label for the dashboard."""
+    if last_run and last_run.get("completed_at"):
+        return f"Last updated: {last_run['completed_at']}"
+    return "No data loaded yet"
+
+
+def _fetch_latest_data() -> dict:
+    """Fetch activities from Strava, store them, and clear cached dashboard data."""
+    with st.spinner("Fetching latest activities from Strava..."):
+        result = run_pipeline()
+    load_data.clear()
+    return result
 
 
 def render() -> None:
     """Render the Streamlit dashboard."""
     st.title("AI Running Coach Dashboard")
-    st.caption("Track your training load, pace, and AI coaching insights")
+
+    st.sidebar.header("Data")
+    if st.sidebar.button("Load latest data", type="primary", use_container_width=True):
+        result = _fetch_latest_data()
+        if result.get("status") == "ok":
+            st.sidebar.success(f"Loaded {result['total_runs']} runs.")
+        else:
+            st.sidebar.error(result.get("message", "Failed to load data."))
+        st.rerun()
 
     data_file = st.sidebar.file_uploader("Upload processed CSV", type=["csv"])
+    last_run = get_last_run()
+
     if data_file is not None:
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as temp_file:
-            temp_file.write(data_file.getvalue())
-            temp_csv_path = Path(temp_file.name)
-        df = load_data(str(temp_csv_path))
+        df = pd.read_csv(data_file, parse_dates=["start_date"])
+        if "pace_min_per_km" not in df.columns:
+            df["pace_min_per_km"] = None
+        df = df.sort_values("start_date").reset_index(drop=True)
+        st.caption("Using uploaded CSV")
     else:
-        latest_csv = get_latest_csv()
-        if latest_csv is None:
-            st.info("No processed run data found. Run the main pipeline first to generate data.")
+        init_db()
+        if not has_activities():
+            st.caption("Track your training load, pace, and AI coaching insights")
+            st.info("No run data yet. Click **Load latest data** in the sidebar to fetch your Strava activities.")
             return
-        df = load_data(str(latest_csv))
+        st.caption(_format_last_sync(last_run))
+        df = load_data(_data_version(last_run))
 
     if df.empty:
         st.warning("No training data to display.")
@@ -81,7 +117,7 @@ def render() -> None:
 
     st.divider()
     st.subheader("💬 Ask Your AI Coach")
-    
+
     try:
         coach = AIRunningCoach()
         user_question = st.chat_input("Ask me anything about your training...")

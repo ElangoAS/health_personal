@@ -37,6 +37,7 @@ OPENAI_DEPLOYMENT_NAME = get_setting("OPENAI_DEPLOYMENT_NAME")
 OPENAI_API_KEY = get_setting("OPENAI_API_KEY")
 OPENAI_MODEL = get_setting("OPENAI_MODEL")
 DATA_DIR = BASE_DIR / "data"
+DATABASE_PATH = DATA_DIR / "running_coach.db"
 CACHE_DIR = DATA_DIR / "cache"
 LOGS_DIR = BASE_DIR / "logs"
 LOG_FILE = LOGS_DIR / "app.log"

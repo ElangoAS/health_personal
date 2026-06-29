@@ -1,18 +1,14 @@
 import pandas as pd
 
-from app.data_processor import process_activities
+from app.data_processor import activities_to_dataframe
 
 
-def test_process_empty_activities(tmp_path):
-    df, processed_path, raw_path = process_activities([], tmp_path)
+def test_process_empty_activities():
+    df = activities_to_dataframe([])
     assert df.empty
-    assert "processed_activities_" in processed_path
-    assert "raw_activities_" in raw_path
-    loaded = pd.read_csv(processed_path)
-    assert loaded.empty
 
 
-def test_process_activities_generates_fields(tmp_path):
+def test_process_activities_generates_fields():
     payload = [
         {
             "id": 123,
@@ -24,7 +20,7 @@ def test_process_activities_generates_fields(tmp_path):
             "average_heartrate": 150,
         }
     ]
-    df, processed_path, raw_path = process_activities(payload, tmp_path)
+    df = activities_to_dataframe(payload)
     assert len(df) == 1
     assert df.loc[0, "distance_km"] == 5.0
     assert df.loc[0, "duration_minutes"] == 25.0
