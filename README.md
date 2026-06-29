@@ -39,14 +39,29 @@ Local alternative:
 streamlit run app/dashboard.py
 ```
 
+The dashboard requires Google sign-in. Only email addresses listed in `ALLOWED_EMAILS` can access the app.
+
+### Google authentication setup
+1. Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml`.
+2. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an OAuth **Web application** client.
+3. Add an authorized redirect URI:
+   - Local: `http://localhost:8501/oauth2callback`
+   - Streamlit Cloud: `https://YOUR-APP.streamlit.app/oauth2callback`
+4. On the Google Auth Platform **Audience** page, add each allowed user as a test user (while the app is in Testing), or publish the app when ready.
+5. Fill in `.streamlit/secrets.toml`:
+   - `ALLOWED_EMAILS` — comma-separated list of Google accounts that may sign in
+   - `[auth]` — `client_id`, `client_secret`, `redirect_uri`, and a strong random `cookie_secret`
+6. Run the dashboard and sign in with an allowed Google account.
+
 The dashboard loads activities from SQLite on startup. Use **Load latest data** in the sidebar to fetch fresh activities from Strava and refresh the view.
 
 ## Deploy on Streamlit Community Cloud
 1. Push this repository to GitHub.
 2. Open [share.streamlit.io](https://share.streamlit.io) and create a new app from the repo.
 3. Set **Main file path** to `streamlit_app.py` (use forward slashes, not `app\dashboard.py`).
-4. Add secrets in the app settings (see `.streamlit/secrets.toml.example`).
-5. Deploy.
+4. Add secrets in the app settings (see `.streamlit/secrets.toml.example`), including `[auth]` and `ALLOWED_EMAILS`.
+5. In Google Cloud, add your Streamlit app redirect URI: `https://YOUR-APP.streamlit.app/oauth2callback`.
+6. Deploy.
 
 **Note:** Cloud hosting uses ephemeral storage, so SQLite data resets on redeploy. Use **Load latest data** after each deploy.
 

@@ -43,6 +43,27 @@ def get_bool_setting(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def get_list_setting(name: str) -> list[str]:
+    """Read a comma-separated list from the environment."""
+    value = get_setting(name)
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def is_google_auth_configured() -> bool:
+    """Return True when Streamlit Google OIDC auth settings are present."""
+    try:
+        import streamlit as st
+
+        auth = st.secrets.get("auth", {})
+        if auth.get("client_id") and auth.get("client_secret"):
+            return True
+    except Exception:
+        pass
+    return bool(get_setting("AUTH_CLIENT_ID") and get_setting("AUTH_CLIENT_SECRET"))
+
+
 STRAVA_ACCESS_TOKEN = get_setting("STRAVA_ACCESS_TOKEN")
 STRAVA_REFRESH_TOKEN = get_setting("STRAVA_REFRESH_TOKEN")
 CLIENT_ID = get_setting("CLIENT_ID")
@@ -57,3 +78,4 @@ CACHE_DIR = DATA_DIR / "cache"
 LOGS_DIR = BASE_DIR / "logs"
 LOG_FILE = LOGS_DIR / "app.log"
 CACHE_ENABLED = get_bool_setting("CACHE_ENABLED", True)
+ALLOWED_EMAILS = get_list_setting("ALLOWED_EMAILS")

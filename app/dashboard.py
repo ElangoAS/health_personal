@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime
 from pathlib import Path
-import tempfile
 
 # Add project root to path so imports work with streamlit run
 project_root = Path(__file__).resolve().parent.parent
@@ -15,6 +13,7 @@ import streamlit as st
 
 from app.ai_coach import AIRunningCoach
 from app.db import has_activities, init_db, load_activities_df
+from app.google_auth import render_auth_sidebar, require_google_auth
 from app.pipeline import get_last_run, run_pipeline
 from app.recommendations import generate_recommendation
 
@@ -57,6 +56,9 @@ def _fetch_latest_data() -> dict:
 
 def render() -> None:
     """Render the Streamlit dashboard."""
+    require_google_auth()
+    render_auth_sidebar()
+
     st.title("AI Running Coach Dashboard")
 
     st.sidebar.header("Data")
@@ -68,23 +70,15 @@ def render() -> None:
             st.sidebar.error(result.get("message", "Failed to load data."))
         st.rerun()
 
-    data_file = st.sidebar.file_uploader("Upload processed CSV", type=["csv"])
     last_run = get_last_run()
 
-    if data_file is not None:
-        df = pd.read_csv(data_file, parse_dates=["start_date"])
-        if "pace_min_per_km" not in df.columns:
-            df["pace_min_per_km"] = None
-        df = df.sort_values("start_date").reset_index(drop=True)
-        st.caption("Using uploaded CSV")
-    else:
-        init_db()
-        if not has_activities():
-            st.caption("Track your training load, pace, and AI coaching insights")
-            st.info("No run data yet. Click **Load latest data** in the sidebar to fetch your Strava activities.")
-            return
-        df = load_data(_data_version(last_run))
-        st.caption(_format_last_sync(last_run, df["start_date"].max()))
+    init_db()
+    if not has_activities():
+        st.caption("Track your training load, pace, and AI coaching insights")
+        st.info("No run data yet. Click **Load latest data** in the sidebar to fetch your Strava activities.")
+        return
+    df = load_data(_data_version(last_run))
+    st.caption(_format_last_sync(last_run, df["start_date"].max()))
 
     if df.empty:
         st.warning("No training data to display.")
