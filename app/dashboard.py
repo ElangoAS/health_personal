@@ -66,6 +66,16 @@ def _render_coach_chat(df: pd.DataFrame) -> None:
 
     st.caption("Ask about training load, pace, recovery, or your next run.")
 
+    from app.config import get_setting
+
+    if not get_setting("GEMINI_API_KEY"):
+        st.warning(
+            "**GEMINI_API_KEY is missing.** Locally, add it to `.env` or `.streamlit/secrets.toml`. "
+            "On Streamlit Cloud, add it under **Settings → Secrets**, then reboot the app."
+        )
+    else:
+        st.caption(f"Using model: {get_setting('GEMINI_MODEL', 'gemini-2.5-flash')}")
+
     with st.expander("Quick questions", expanded=False):
         for prompt in (
             "How was my week?",

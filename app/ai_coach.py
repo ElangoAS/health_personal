@@ -37,7 +37,7 @@ class AIRunningCoach:
     ) -> None:
         self.logger = logger or setup_logging()
         self.api_key = api_key or GEMINI_API_KEY or get_setting("GEMINI_API_KEY")
-        self.model_name = model or GEMINI_MODEL or get_setting("GEMINI_MODEL", "gemini-2.0-flash")
+        self.model_name = model or GEMINI_MODEL or get_setting("GEMINI_MODEL", "gemini-2.5-flash")
 
         if not self.api_key:
             raise ValueError("Gemini API key is missing. Set GEMINI_API_KEY in .env or Streamlit secrets.")
@@ -102,4 +102,14 @@ Please provide specific, actionable coaching advice based on this data."""
             return response.text or "No response generated."
         except Exception as exc:
             self.logger.exception("Failed to get response from Gemini: %s", exc)
-            raise RuntimeError(f"Failed to get AI coaching response: {str(exc)}") from exc
+            message = str(exc)
+            if "429" in message or "RESOURCE_EXHAUSTED" in message:
+                raise RuntimeError(
+                    "Gemini API quota exceeded for this model. "
+                    "Try again later or set GEMINI_MODEL=gemini-2.5-flash in your secrets."
+                ) from exc
+            if "API key" in message or "API_KEY" in message:
+                raise RuntimeError(
+                    "Invalid or missing Gemini API key. Set GEMINI_API_KEY in .env or Streamlit secrets."
+                ) from exc
+            raise RuntimeError(f"Failed to get AI coaching response: {message}") from exc
