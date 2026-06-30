@@ -60,7 +60,9 @@ The dashboard loads activities from SQLite on startup. Use **Load latest data** 
 2. Open [share.streamlit.io](https://share.streamlit.io) and create a new app from the repo.
 3. Set **Main file path** to `streamlit_app.py` (use forward slashes, not `app\dashboard.py`).
 4. Add secrets in the app settings (see `.streamlit/secrets.toml.example`), including `[auth]` and `ALLOWED_EMAILS`.
-5. In Google Cloud, add your Streamlit app redirect URI: `https://YOUR-APP.streamlit.app/oauth2callback`.
+   - Open **Settings → Secrets** and paste your full TOML (the local `.streamlit/secrets.toml` file is **not** uploaded to GitHub).
+   - Set `redirect_uri` to your Cloud URL, e.g. `https://YOUR-APP.streamlit.app/oauth2callback` (not `localhost`).
+5. In Google Cloud, add the same Cloud redirect URI under **Clients → Authorized redirect URIs**.
 6. Deploy.
 
 **Note:** Cloud hosting uses ephemeral storage, so SQLite data resets on redeploy. Use **Load latest data** after each deploy.

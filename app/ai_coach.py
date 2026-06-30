@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Optional
 
 import pandas as pd
-from openai import AzureOpenAI
+from google import genai
+from google.genai import types
 
 try:
-    from .config import OPENAI_API_KEY, OPENAI_DEPLOYMENT_NAME, OPENAI_ENDPOINT, get_setting
+    from .config import GEMINI_API_KEY, GEMINI_MODEL, get_setting
 except ImportError:  # pragma: no cover
-    from config import OPENAI_API_KEY, OPENAI_DEPLOYMENT_NAME, OPENAI_ENDPOINT, get_setting
+    from config import GEMINI_API_KEY, GEMINI_MODEL, get_setting
 
 from .utils import setup_logging
 
@@ -27,30 +27,22 @@ def _format_number(value: Any, fmt: str, suffix: str = "") -> str:
 
 
 class AIRunningCoach:
-    """AI coach that provides personalized running advice using Azure OpenAI."""
+    """AI coach that provides personalized running advice using Google Gemini."""
 
     def __init__(
         self,
-        endpoint: Optional[str] = None,
-        deployment_name: Optional[str] = None,
         api_key: Optional[str] = None,
-        api_version: str = "2024-08-01-preview",
+        model: Optional[str] = None,
         logger: Optional[Any] = None,
     ) -> None:
         self.logger = logger or setup_logging()
-        self.endpoint = endpoint or OPENAI_ENDPOINT or get_setting("OPENAI_ENDPOINT")
-        self.deployment_name = deployment_name or OPENAI_DEPLOYMENT_NAME or get_setting("OPENAI_DEPLOYMENT_NAME")
-        self.api_key = api_key or OPENAI_API_KEY or get_setting("OPENAI_API_KEY")
-        self.api_version = api_version
+        self.api_key = api_key or GEMINI_API_KEY or get_setting("GEMINI_API_KEY")
+        self.model_name = model or GEMINI_MODEL or get_setting("GEMINI_MODEL", "gemini-2.0-flash")
 
-        if not all([self.endpoint, self.deployment_name, self.api_key]):
-            raise ValueError("Azure OpenAI credentials are missing. Check .env for OPENAI_ENDPOINT, OPENAI_DEPLOYMENT_NAME, OPENAI_API_KEY")
+        if not self.api_key:
+            raise ValueError("Gemini API key is missing. Set GEMINI_API_KEY in .env or Streamlit secrets.")
 
-        self.client = AzureOpenAI(
-            api_key=self.api_key,
-            api_version=self.api_version,
-            azure_endpoint=self.endpoint,
-        )
+        self.client = genai.Client(api_key=self.api_key)
 
     def _build_context(self, df: pd.DataFrame) -> str:
         """Build a text summary of activity data for context."""
@@ -84,7 +76,7 @@ Running Activity Summary:
         """Ask the AI coach a question about your training, with activity context."""
         context = self._build_context(activity_df)
 
-        system_message = """You are an experienced running coach with expertise in training plans, performance analysis, and injury prevention. 
+        system_message = """You are an experienced running coach with expertise in training plans, performance analysis, and injury prevention.
 You provide personalized advice based on the runner's activity data and training history.
 Be concise, actionable, and supportive in your responses.
 Use the provided activity summary to give context-aware coaching advice."""
@@ -98,16 +90,16 @@ Question: {question}
 Please provide specific, actionable coaching advice based on this data."""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.deployment_name,
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_message},
-                ],
-                temperature=0.7,
-                max_tokens=500,
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=user_message,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_message,
+                    temperature=0.7,
+                    max_output_tokens=500,
+                ),
             )
-            return response.choices[0].message.content or "No response generated."
+            return response.text or "No response generated."
         except Exception as exc:
-            self.logger.exception("Failed to get response from Azure OpenAI: %s", exc)
+            self.logger.exception("Failed to get response from Gemini: %s", exc)
             raise RuntimeError(f"Failed to get AI coaching response: {str(exc)}") from exc

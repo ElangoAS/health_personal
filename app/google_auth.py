@@ -47,7 +47,14 @@ def require_google_auth() -> bool:
     if not is_google_auth_configured():
         st.error(
             "Google authentication is not configured. "
-            "Add an `[auth]` section to `.streamlit/secrets.toml` (see `.streamlit/secrets.toml.example`)."
+            "Add an `[auth]` section with `client_id`, `client_secret`, `redirect_uri`, "
+            "and `cookie_secret`."
+        )
+        st.info(
+            "**Local:** copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and fill in your values.\n\n"
+            "**Streamlit Cloud:** open your app → **Settings** → **Secrets**, paste the same TOML "
+            "(including `[auth]` and `ALLOWED_EMAILS`), and set `redirect_uri` to "
+            "`https://YOUR-APP.streamlit.app/oauth2callback`."
         )
         st.stop()
         return False

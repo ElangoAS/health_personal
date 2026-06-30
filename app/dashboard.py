@@ -125,7 +125,7 @@ def render() -> None:
             st.chat_message("user").write(user_question)
             st.chat_message("assistant").write(response)
     except ValueError as exc:
-        st.warning(f"Azure OpenAI not configured: {str(exc)}")
+        st.warning(f"Gemini not configured: {str(exc)}")
     except Exception as exc:
         st.error(f"Error contacting AI Coach: {str(exc)}")
 
