@@ -18,7 +18,7 @@ from app.pipeline import get_last_run, run_pipeline
 from app.recommendations import generate_recommendation
 
 
-st.set_page_config(page_title="AI Running Coach", page_icon="🏃", layout="wide")
+st.set_page_config(page_title="AI Running Coach", page_icon="🏃", layout="wide", initial_sidebar_state="auto")
 
 
 @st.cache_data(show_spinner=False)
@@ -54,6 +54,88 @@ def _fetch_latest_data() -> dict:
     return result
 
 
+def _init_coach_chat() -> None:
+    """Initialize chat history in session state."""
+    if "coach_messages" not in st.session_state:
+        st.session_state.coach_messages = []
+
+
+def _render_coach_chat(df: pd.DataFrame) -> None:
+    """Render the AI coach chat with history and quick prompts for mobile."""
+    _init_coach_chat()
+
+    st.caption("Ask about training load, pace, recovery, or your next run.")
+
+    with st.expander("Quick questions", expanded=False):
+        for prompt in (
+            "How was my week?",
+            "Am I overtraining?",
+            "What should I focus on next?",
+        ):
+            if st.button(prompt, key=f"quick_{prompt}", use_container_width=True):
+                st.session_state.pending_coach_question = prompt
+
+    for message in st.session_state.coach_messages:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+
+    user_question = st.session_state.pop("pending_coach_question", None)
+    if user_question is None:
+        user_question = st.chat_input("Ask me anything about your training...")
+
+    if not user_question:
+        return
+
+    st.session_state.coach_messages.append({"role": "user", "content": user_question})
+
+    try:
+        coach = AIRunningCoach()
+        with st.spinner("Coach is thinking..."):
+            response = coach.ask_coach(user_question, df)
+        st.session_state.coach_messages.append({"role": "assistant", "content": response})
+    except ValueError as exc:
+        st.session_state.coach_messages.pop()
+        st.warning(f"Gemini not configured: {str(exc)}")
+    except Exception as exc:
+        st.session_state.coach_messages.pop()
+        st.error(f"Error contacting AI Coach: {str(exc)}")
+
+    st.rerun()
+
+
+def _render_training_overview(df: pd.DataFrame, recent_df: pd.DataFrame) -> None:
+    """Render metrics, charts, and recommendations."""
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total runs", len(df))
+    c2.metric("Total distance", f"{df['distance_km'].sum():.1f} km")
+    c3.metric("Average pace", f"{df['pace_min_per_km'].dropna().mean():.2f} min/km")
+
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        st.subheader("Distance trend")
+        st.line_chart(recent_df.set_index("start_date")["distance_km"])
+
+    with chart_col2:
+        st.subheader("Pace trend")
+        st.line_chart(recent_df.set_index("start_date")["pace_min_per_km"])
+
+    st.subheader("Weekly distance")
+    weekly = recent_df.set_index("start_date").resample("W")["distance_km"].sum().reset_index()
+    st.bar_chart(weekly.set_index("start_date")["distance_km"])
+
+    st.subheader("Recent runs")
+    st.dataframe(
+        recent_df[["name", "start_date", "distance_km", "duration_minutes", "pace_min_per_km"]].rename(
+            columns={"pace_min_per_km": "pace_min_per_km"}
+        ),
+        use_container_width=True,
+    )
+
+    st.subheader("AI Recommendations")
+    for insight in generate_recommendation(df):
+        st.info(insight)
+
+
 def render() -> None:
     """Render the Streamlit dashboard."""
     require_google_auth()
@@ -87,47 +169,13 @@ def render() -> None:
     run_limit = st.sidebar.slider("Number of recent runs", min_value=5, max_value=min(50, len(df)), value=min(10, len(df)))
     recent_df = df.tail(run_limit).copy()
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total runs", len(df))
-    c2.metric("Total distance", f"{df['distance_km'].sum():.1f} km")
-    c3.metric("Average pace", f"{df['pace_min_per_km'].dropna().mean():.2f} min/km")
+    training_tab, coach_tab = st.tabs(["📊 Training", "💬 AI Coach"])
 
-    chart_col1, chart_col2 = st.columns(2)
-    with chart_col1:
-        st.subheader("Distance trend")
-        st.line_chart(recent_df.set_index("start_date")["distance_km"])
+    with training_tab:
+        _render_training_overview(df, recent_df)
 
-    with chart_col2:
-        st.subheader("Pace trend")
-        st.line_chart(recent_df.set_index("start_date")["pace_min_per_km"])
-
-    st.subheader("Weekly distance")
-    weekly = recent_df.set_index("start_date").resample("W")["distance_km"].sum().reset_index()
-    st.bar_chart(weekly.set_index("start_date")["distance_km"])
-
-    st.subheader("Recent runs")
-    st.dataframe(recent_df[["name", "start_date", "distance_km", "duration_minutes", "pace_min_per_km"]].rename(columns={"pace_min_per_km": "pace_min_per_km"}), use_container_width=True)
-
-    st.subheader("AI Recommendations")
-    for insight in generate_recommendation(df):
-        st.info(insight)
-
-    st.divider()
-    st.subheader("💬 Ask Your AI Coach")
-
-    try:
-        coach = AIRunningCoach()
-        user_question = st.chat_input("Ask me anything about your training...")
-
-        if user_question:
-            with st.spinner("Coach is thinking..."):
-                response = coach.ask_coach(user_question, df)
-            st.chat_message("user").write(user_question)
-            st.chat_message("assistant").write(response)
-    except ValueError as exc:
-        st.warning(f"Gemini not configured: {str(exc)}")
-    except Exception as exc:
-        st.error(f"Error contacting AI Coach: {str(exc)}")
+    with coach_tab:
+        _render_coach_chat(df)
 
 
 if __name__ == "__main__":
